@@ -1,4 +1,3 @@
-import numpy
 import pandas as pd
 
 # set option to show all rows
@@ -40,12 +39,20 @@ def getMatches(ficheDF, systemDF):
                         if row[Quantities] == systemDF['Quantities'][i]:
                             # check if Tax_Value is equal to systemTax_Value
                             if row[Tax_Values] == systemDF['Tax_Values'][i]:
-                                print("Found perfect match: ")
-                                print(index, i)
+                                #print("Found perfect match: ")
+                                #print(index, i)
                                 # save i and index into matches list
                                 matches.append([i, index])
                                 break
     return matches
+
+
+# this function because : "if row[SH_Codes] in systemDF['SH_Codes']" is not working
+def isIn(SH_Code, row):
+    for i in row:
+        if i == SH_Code:
+            return True
+    return False
 
 
 def getCorrected(ficheDF, systemDF):
@@ -53,13 +60,11 @@ def getCorrected(ficheDF, systemDF):
     # correct errors in DeclaredValues and Tax_Values and Quantities
     for index, row in ficheDF.iterrows():
         # check if SH_Code is in systemDF
-        if row[SH_Codes] in systemDF['SH_Codes']:
+        if isIn(row[SH_Codes], systemDF['SH_Codes']):
             # get list of indexes of row in systemDF
             indexList = systemDF[systemDF['SH_Codes'] == row[SH_Codes]].index
-            print("IndexList: " + indexList)
             # loop through each index in indexList
             for i in indexList:
-                print("lol")
                 # check if Tax_Code is equal to systemTax_Code
                 if row[Tax_Codes] == systemDF['Tax_Codes'][i]:
                     # replace systemDeclaredValue with ficheDeclaredValue
@@ -69,7 +74,7 @@ def getCorrected(ficheDF, systemDF):
                     # replace systemQuantity with ficheQuantity
                     systemDF['Quantities'][i] = row[Quantities]
                     # save i and index into corrected list
-                    print("Corrected: " + str(index) + " " + str(i))
+                    #print("Corrected: " + str(index) + " " + str(i))
                     corrected.append([i, index])
                     break
     return corrected
@@ -77,7 +82,6 @@ def getCorrected(ficheDF, systemDF):
 
 def getGroups(ficheDF, systemDF):
     # the algorithm:
-
     # count number of lines left, each line is a bit for a binary number, loop through each number in binary and check if sumQuantity is equal to systemQuantity
     # if sumQuantity is equal to systemQuantity, check if sumDeclaredValue is close enough to systemDeclaredValue
     # then get current binary number and add it to matches list
@@ -125,19 +129,57 @@ def removeMatches(matches, ficheDF, systemDF):
     for i in matches:
         ficheDF = ficheDF.drop(i[1])
         systemDF = systemDF.drop(i[0])
-
+    # reset index
     ficheDF.reset_index(drop=True, inplace=True)
     systemDF.reset_index(drop=True, inplace=True)
+    return ficheDF, systemDF
 
 
 def removeCorrected(corrected, ficheDF, systemDF):
     # remove corrected from ficheDF and systemDF
     for i in corrected:
-        ficheDF = ficheDF.drop(i[1], inplace=True)
-        systemDF = systemDF.drop(i[0], inplace=True)
-
+        ficheDF = ficheDF.drop(i[1])
+        systemDF = systemDF.drop(i[0])
+    # reset index
     ficheDF.reset_index(drop=True, inplace=True)
     systemDF.reset_index(drop=True, inplace=True)
+    return ficheDF, systemDF
+
+
+def getDeviationFromGroups(groups, ficheDF, systemDF):
+    deviation = 0
+    for i in groups:
+        # get binary representation of group
+        binary = i[0][2:]
+        sumTaxValue = 0
+        for j in range(len(binary)):
+            if binary[j] == '1':
+                # add quantity to sumTaxValue
+                sumTaxValue += ficheDF['Tax_Values'][j]
+        # get systemTaxValue
+        systemTaxValue = systemDF['Tax_Values'][i[1]]
+        # calculate deviation
+        deviation += abs(sumTaxValue - systemTaxValue)
+    return deviation
+
+
+# is this function needed?
+def getDeviationFromFicheAndSystem(ficheDF, systemDF):
+    deviation = 0
+    for i in range(ficheDF.shape[0]):
+        # get sumTaxValue
+        sumTaxValue = ficheDF['Tax_Values'][i]
+        # get systemTaxValue
+        systemTaxValue = systemDF['Tax_Values'][i]
+        # calculate deviation
+        deviation += abs(sumTaxValue - systemTaxValue)
+    return deviation
+
+
+def calculateDeviation(ficheDF, systemDF, groups):
+    # get deviation from groups
+    deviation = getDeviationFromGroups(groups, ficheDF, systemDF)
+    print("Deviation: " + str(deviation))
 
 
 def main():
@@ -146,17 +188,21 @@ def main():
     systemDF = pd.read_excel("system.xlsx")
 
     matches = getMatches(ficheDF, systemDF)
-    print(matches)
+    print("Matches: ", matches)
 
-    removeMatches(matches, ficheDF, systemDF)
+    ficheDF, systemDF = removeMatches(matches, ficheDF, systemDF)
     print(ficheDF)
     print(systemDF)
 
-
-
-    corrected = getCorrected(ficheDF, systemDF)
+    corrected = [] #getCorrected(ficheDF, systemDF)
     print("Corrected: ", corrected)
+    #ficheDF, systemDF = removeCorrected(corrected, ficheDF, systemDF)
 
+    print("FicheDF: ", ficheDF)
+    print("SystemDF: ", systemDF)
 
+    groups = getGroups(ficheDF, systemDF)
+    print("Groups: ", groups)
 
-    removeCorrected(corrected, ficheDF, systemDF)
+    calculateDeviation(ficheDF, systemDF, groups)
+main()
