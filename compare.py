@@ -183,7 +183,6 @@ def calculateDeviation(ficheDF, systemDF, groups):
 
 
 def main():
-        
     ficheDF = pd.read_excel("output.xlsx")
     systemDF = pd.read_excel("system.xlsx")
 
@@ -205,4 +204,5 @@ def main():
     print("Groups: ", groups)
 
     calculateDeviation(ficheDF, systemDF, groups)
+    
 main()
