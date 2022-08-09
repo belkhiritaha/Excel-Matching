@@ -1,4 +1,3 @@
-import sys
 import pandas as pd
 
 ficheDF = pd.read_excel("output.xlsx")
@@ -39,30 +38,11 @@ for index, row in ficheDF.iterrows():
                     if row[3] == systemDF['Quantities'][i]:
                         # check if Tax_Value is equal to systemTax_Value
                         if row[4] == systemDF['Tax_Values'][i]:
-                            # if all values are equal, print line
-                            print("Found perfect match: ")
-                            print(index, i)
-                            #print(row)
+                            #print("Found perfect match: ")
+                            #print(index, i)
                             # save i and index into matches list
                             matches.append([i, index])
-                        else:
-                            # if Tax_Value is not equal, print line
-                            print("Found match with different Tax_Value: ")
-                    # if Quantity is not equal to systemQuantity, break out of loop
-                    else:
-                        print("Found mismatch in Quantity: ")
-                        #print indexes
-                        print(index, i)
-                # if Tax_Code is not equal to systemTax_Code, break out of loop
-                else:
-                    print("Found mismatch in Tax_Code: ")
-                    # print systemRow and ficheRow
-                    print(index, i)
-            # if DeclaredValue is not equal to systemDeclaredValue, break out of loop
-            else:
-                print("Found mismatch in DeclaredValue: ")
-                print(index, i)
-        
+                            break
 
 print(matches)
 # remove matches from ficheDF and systemDF
@@ -73,4 +53,67 @@ for i in matches:
 print(ficheDF)
 print(systemDF)
 
+corrected = []
+# correct errors in DeclaredValues and Tax_Values and Quantities
+for index, row in ficheDF.iterrows():
+    # check if SH_Code is in systemDF
+    if row[0] in systemDF['SH_Codes']:
+        # get list of indexes of row in systemDF
+        indexList = systemDF[systemDF['SH_Codes'] == row[0]].index
+        # loop through each index in indexList
+        for i in indexList:
+            # check if Tax_Code is equal to systemTax_Code
+            if row[2] == systemDF['Tax_Codes'][i]:
+                # replace systemDeclaredValue with ficheDeclaredValue
+                systemDF['DeclaredValues'][i] = row[1]
+                # replace systemTax_Value with ficheTax_Value
+                systemDF['Tax_Values'][i] = row[4]
+                # replace systemQuantity with ficheQuantity
+                systemDF['Quantities'][i] = row[3]
+                # save i and index into corrected list
+                corrected.append([i, index])
+                break
 
+# remove corrected from ficheDF and systemDF
+for i in corrected:
+    ficheDF = ficheDF.drop(i[0])
+    systemDF = systemDF.drop(i[0])
+
+# the algorithm:
+
+# count number of lines left, each line is a bit for a binary number, loop through each number in binary and check if sumQuantity is equal to systemQuantity
+# if sumQuantity is equal to systemQuantity, check if sumDeclaredValue is close enough to systemDeclaredValue
+# then get current binary number and add it to matches list
+# if sumQuantity is not equal to systemQuantity, go to next binary
+
+# count number of lines left
+linesLeft = ficheDF.shape[0]
+print(linesLeft)
+
+# loop through each lineLeft
+for i in range(linesLeft):
+    # loop through each binary number
+    for j in range(2**linesLeft):
+        # get binary representation of j
+        binary = bin(j)[2:]
+        # get sumQuantity
+        sumQuantity = 0
+        for k in range(linesLeft):
+            if binary[k] == '1':
+                # add quantity to sumQuantity
+                sumQuantity += ficheDF['Quantities'][k]
+        # check if sumQuantity is equal to systemQuantity
+        if sumQuantity == systemDF['Quantities'][i]:
+            # get sumDeclaredValue
+            sumDeclaredValue = 0
+            for k in range(linesLeft):
+                if binary[k] == '1':
+                    # add quantity to sumDeclaredValue
+                    sumDeclaredValue += ficheDF['DeclaredValues'][k]
+            # check if sumDeclaredValue is close enough to systemDeclaredValue
+            if abs(sumDeclaredValue - systemDF['DeclaredValues'][i]) < 0.01:
+                # get current binary number
+                currentBinary = j
+                # add currentBinary to matches list
+                matches.append([currentBinary, i])
+                break
